@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import subprocess
 import threading
-import os
 
 app = Flask(__name__)
 
@@ -25,10 +24,10 @@ def start_streaming():
 
     data = request.json
     video_url = data.get("video_url")
-    output_url = data.get("output_url", "rtmp://127.0.0.1:1935/live/test")
+    rtmp_server_url = data.get("rtmp_server_url")
 
-    if not video_url:
-        return jsonify({"error": "Missing video_url"}), 400
+    if not video_url or not rtmp_server_url:
+        return jsonify({"error": "Missing video_url or rtmp_server_url"}), 400
 
     if streaming_process and streaming_process.poll() is None:
         return jsonify({"error": "Streaming is already running."}), 400
@@ -39,7 +38,7 @@ def start_streaming():
             "python", "-m", "yt_dlp", "-o", "-", video_url
         ]
         ffmpeg_command = [
-            "ffmpeg", "-re", "-i", "-", "-c:v", "copy", "-f", "flv", output_url
+            "ffmpeg", "-re", "-i", "-", "-c:v", "copy", "-f", "flv", rtmp_server_url
         ]
 
         print(f"Starting yt-dlp: {' '.join(yt_dlp_command)}")
@@ -60,7 +59,7 @@ def start_streaming():
         log_output(yt_dlp_process, "yt-dlp")
         log_output(streaming_process, "ffmpeg")
 
-        return jsonify({"message": "Streaming started successfully!", "output_url": output_url}), 200
+        return jsonify({"message": "Streaming started successfully!"}), 200
 
     except Exception as e:
         return jsonify({"error": f"Failed to start streaming: {str(e)}"}), 500
@@ -85,13 +84,5 @@ def stop_streaming():
         return jsonify({"error": f"Failed to stop streaming: {str(e)}"}), 500
 
 
-@app.route('/health-check', methods=['GET'])
-def health_check():
-    return jsonify({"status": "Server is running"}), 200
-
-
 if __name__ == '__main__':
-    # Use the port from the environment variable (for Render deployment)
-    port = int(os.environ.get("PORT", 5000))
-    # Run the app on all available IPs (0.0.0.0) for cloud deployments
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='127.0.0.1', port=5000)
