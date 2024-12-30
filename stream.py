@@ -52,5 +52,5 @@ def stop_streaming():
     except Exception as e:
         return jsonify({"error": f"Error occurred while stopping the stream: {str(e)}"}), 500
 
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000)
+port = int(os.environ.get("PORT", 9000))
+app.run(host="0.0.0.0", port=port)
