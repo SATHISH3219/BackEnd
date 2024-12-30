@@ -1,5 +1,6 @@
 {
-  "dependencies": {
-    "node": "^23.5.0"
+  "scripts": {
+    "install": "apt-get update && apt-get install -y python3",
+    "start": "python3 stream.py"
   }
 }
