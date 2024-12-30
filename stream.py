@@ -19,6 +19,11 @@ def log_output(process, label):
     threading.Thread(target=read_stream, args=(process.stderr, "stderr"), daemon=True).start()
 
 
+@app.route('/')
+def home():
+    return jsonify({"message": "Welcome to the Streaming Service!"})
+
+
 @app.route('/start-streaming', methods=['POST'])
 def start_streaming():
     global streaming_process
@@ -88,6 +93,14 @@ def stop_streaming():
 @app.route('/health-check', methods=['GET'])
 def health_check():
     return jsonify({"status": "Server is running"}), 200
+
+
+@app.route('/stream-status', methods=['GET'])
+def stream_status():
+    if streaming_process and streaming_process.poll() is None:
+        return jsonify({"message": "Streaming is currently active."}), 200
+    else:
+        return jsonify({"message": "No active streaming process."}), 200
 
 
 if __name__ == '__main__':
