@@ -1,8 +1,84 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Streaming</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    video {
+      max-width: 100%;
+      height: auto;
+    }
+    .controls {
+      margin-top: 20px;
+    }
+  </style>
+</head>
 <body>
-    <video id="video" width="640" height="360" controls>
-        <source src="rtmp://localhost/live/stream" type="rtmp/flv">
-        Your browser does not support the video tag.
+  <h1>Video Streaming Service</h1>
+  <div>
+    <video id="videoPlayer" controls>
+      <source src="" type="video/mp4">
+      Your browser does not support the video tag.
     </video>
+  </div>
+  <div class="controls">
+    <input type="text" id="videoUrl" placeholder="Enter Video URL" style="width: 300px;">
+    <button onclick="startStreaming()">Start Streaming</button>
+    <button onclick="stopStreaming()">Stop Streaming</button>
+  </div>
+
+  <script>
+    const backendUrl = "http://192.168.163.31:5000";
+
+    async function startStreaming() {
+      const videoUrl = document.getElementById("videoUrl").value;
+      if (!videoUrl) {
+        alert("Please enter a video URL!");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${backendUrl}/start-streaming`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_url: videoUrl })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          document.getElementById("videoPlayer").src = `${backendUrl}/video`;
+          alert("Streaming started! You can watch the video now.");
+        } else {
+          alert(`Error: ${data.error}`);
+        }
+      } catch (error) {
+        alert(`Failed to start streaming: ${error.message}`);
+      }
+    }
+
+    async function stopStreaming() {
+      try {
+        const response = await fetch(`${backendUrl}/stop-streaming`, { method: "POST" });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          document.getElementById("videoPlayer").src = "";
+          alert("Streaming stopped and video deleted.");
+        } else {
+          alert(`Error: ${data.error}`);
+        }
+      } catch (error) {
+        alert(`Failed to stop streaming: ${error.message}`);
+      }
+    }
+  </script>
 </body>
 </html>
