@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, Response, send_file
 from flask_cors import CORS
 import subprocess
 import os
@@ -16,22 +16,14 @@ def home():
 def start_streaming():
     data = request.json
     video_url = data.get("video_url")
-    cookies = data.get("cookies")
 
     if not video_url:
         return jsonify({"error": "Missing video_url"}), 400
 
-    if not cookies:
-        return jsonify({"error": "Missing cookies"}), 400
-
     try:
-        # Save the cookies to a file
-        with open("cookies.txt", "w") as cookie_file:
-            cookie_file.write(cookies)
-
-        # Download and convert video using yt-dlp and ffmpeg with cookies
+        # Download and convert video using yt-dlp and ffmpeg
         yt_dlp_command = [
-            "python", "-m", "yt_dlp", "--cookies", "cookies.txt", "-o", "-", video_url
+            "python", "-m", "yt_dlp", "-o", "-", video_url
         ]
         ffmpeg_command = [
             "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-movflags", "frag_keyframe+empty_moov",
