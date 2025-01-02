@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template_string
 from flask_cors import CORS
 import subprocess
 import os
@@ -7,11 +7,26 @@ app = Flask(__name__)
 CORS(app, origins=["*"])  # Allow access from any origin
 
 VIDEO_OUTPUT = "streamed_video.mp4"
-COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")  # Default to 'cookies.txt' if not set
+COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")  # Environment variable for cookies file
 
 @app.route('/')
 def home():
-    return jsonify({"message": "Welcome to the Video Service!"})
+    if os.path.exists(VIDEO_OUTPUT):
+        video_embed_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Video Streaming</title></head>
+        <body>
+            <h1>Video is Ready for Streaming</h1>
+            <video width="640" height="360" controls>
+                <source src="/video" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </body>
+        </html>
+        """
+        return render_template_string(video_embed_html)
+    return jsonify({"message": "Welcome to the Video Service! No video is currently available for streaming."})
 
 @app.route('/start-streaming', methods=['POST'])
 def start_streaming():
@@ -22,7 +37,7 @@ def start_streaming():
         return jsonify({"error": "Missing video_url"}), 400
 
     if not os.path.exists(COOKIES_FILE):
-        return jsonify({"error": "Cookies file not found"}), 500
+        return jsonify({"error": f"Cookies file not found at {COOKIES_FILE}"}), 500
 
     try:
         # Download and convert video using yt-dlp and ffmpeg
@@ -30,12 +45,12 @@ def start_streaming():
             "python", "-m", "yt_dlp", "--cookies", COOKIES_FILE, "-o", "-", video_url
         ]
         ffmpeg_command = [
-            "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast",
-            "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", VIDEO_OUTPUT
+            "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-movflags", "frag_keyframe+empty_moov",
+            "-f", "mp4", VIDEO_OUTPUT
         ]
 
-        yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE)
-        ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout)
+        yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout, stderr=subprocess.PIPE)
         yt_dlp_process.stdout.close()
         ffmpeg_process.communicate()
 
