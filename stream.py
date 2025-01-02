@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, Response, send_file
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import subprocess
 import os
@@ -7,6 +7,7 @@ app = Flask(__name__)
 CORS(app, origins=["*"])  # Allow access from any origin
 
 VIDEO_OUTPUT = "streamed_video.mp4"
+COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")  # Default to 'cookies.txt' if not set
 
 @app.route('/')
 def home():
@@ -20,14 +21,17 @@ def start_streaming():
     if not video_url:
         return jsonify({"error": "Missing video_url"}), 400
 
+    if not os.path.exists(COOKIES_FILE):
+        return jsonify({"error": "Cookies file not found"}), 500
+
     try:
         # Download and convert video using yt-dlp and ffmpeg
         yt_dlp_command = [
-            "python", "-m", "yt_dlp", "-o", "-", video_url
+            "python", "-m", "yt_dlp", "--cookies", COOKIES_FILE, "-o", "-", video_url
         ]
         ffmpeg_command = [
-            "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-movflags", "frag_keyframe+empty_moov",
-            "-f", "mp4", VIDEO_OUTPUT
+            "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast",
+            "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", VIDEO_OUTPUT
         ]
 
         yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE)

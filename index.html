@@ -3,82 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Streaming</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 20px;
-    }
-    video {
-      max-width: 100%;
-      height: auto;
-    }
-    .controls {
-      margin-top: 20px;
-    }
-  </style>
+  <title>Video Streaming Service</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 <body>
-  <h1>Video Streaming Service</h1>
-  <div>
-    <video id="videoPlayer" controls>
-      <source src="" type="video/mp4">
-      Your browser does not support the video tag.
-    </video>
-  </div>
-  <div class="controls">
-    <input type="text" id="videoUrl" placeholder="Enter Video URL" style="width: 300px;">
-    <button onclick="startStreaming()">Start Streaming</button>
-    <button onclick="stopStreaming()">Stop Streaming</button>
+  <div class="container mt-5">
+    <h1 class="text-center">Video Streaming Service</h1>
+    <div class="mb-4">
+      <label for="videoUrl" class="form-label">YouTube Video URL</label>
+      <input
+        type="text"
+        id="videoUrl"
+        class="form-control"
+        placeholder="Enter the YouTube video URL"
+      />
+    </div>
+    <div class="text-center">
+      <button id="startStreamingBtn" class="btn btn-primary">Start Streaming</button>
+      <button id="stopStreamingBtn" class="btn btn-danger ms-3">Stop Streaming</button>
+    </div>
+
+    <div id="videoContainer" class="mt-5 text-center d-none">
+      <h2>Video Preview</h2>
+      <video id="videoPlayer" controls class="w-100">
+        <source src="" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+    </div>
+    <div id="messageContainer" class="mt-5"></div>
   </div>
 
   <script>
-    const backendUrl = "http://192.168.65.31:5000";
+    const baseUrl = "http://192.168.65.31:5000"; // Replace with your Render URL
+    const startStreamingBtn = document.getElementById("startStreamingBtn");
+    const stopStreamingBtn = document.getElementById("stopStreamingBtn");
+    const videoUrlInput = document.getElementById("videoUrl");
+    const videoContainer = document.getElementById("videoContainer");
+    const videoPlayer = document.getElementById("videoPlayer");
+    const messageContainer = document.getElementById("messageContainer");
 
-    async function startStreaming() {
-      const videoUrl = document.getElementById("videoUrl").value;
+    function showMessage(message, type = "success") {
+      messageContainer.innerHTML = `
+        <div class="alert alert-${type}" role="alert">
+          ${message}
+        </div>
+      `;
+    }
+
+    startStreamingBtn.addEventListener("click", async () => {
+      const videoUrl = videoUrlInput.value;
       if (!videoUrl) {
-        alert("Please enter a video URL!");
+        showMessage("Please enter a valid YouTube video URL.", "danger");
         return;
       }
 
+      showMessage("Processing video... Please wait.", "info");
       try {
-        const response = await fetch(`${backendUrl}/start-streaming`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ video_url: videoUrl })
-        });
+        const response = await axios.post(`${baseUrl}/start-streaming`, { video_url: videoUrl });
+        const { message, video_url } = response.data;
 
-        const data = await response.json();
-
-        if (response.ok) {
-          document.getElementById("videoPlayer").src = `${backendUrl}/video`;
-          alert("Streaming started! You can watch the video now.");
-        } else {
-          alert(`Error: ${data.error}`);
-        }
+        showMessage(message, "success");
+        videoPlayer.src = `${baseUrl}${video_url}`;
+        videoContainer.classList.remove("d-none");
       } catch (error) {
-        alert(`Failed to start streaming: ${error.message}`);
+        const errorMessage = error.response?.data?.error || "Failed to process video.";
+        showMessage(errorMessage, "danger");
       }
-    }
+    });
 
-    async function stopStreaming() {
+    stopStreamingBtn.addEventListener("click", async () => {
       try {
-        const response = await fetch(`${backendUrl}/stop-streaming`, { method: "POST" });
+        const response = await axios.post(`${baseUrl}/stop-streaming`);
+        const { message } = response.data;
 
-        const data = await response.json();
-
-        if (response.ok) {
-          document.getElementById("videoPlayer").src = "";
-          alert("Streaming stopped and video deleted.");
-        } else {
-          alert(`Error: ${data.error}`);
-        }
+        showMessage(message, "success");
+        videoPlayer.src = "";
+        videoContainer.classList.add("d-none");
       } catch (error) {
-        alert(`Failed to stop streaming: ${error.message}`);
+        const errorMessage = error.response?.data?.error || "Failed to stop streaming.";
+        showMessage(errorMessage, "danger");
       }
-    }
+    });
   </script>
 </body>
 </html>
