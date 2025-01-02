@@ -1,13 +1,11 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, Response, send_file
 from flask_cors import CORS
 import subprocess
 import os
-import tempfile
 
 app = Flask(__name__)
 CORS(app, origins=["*"])  # Allow access from any origin
 
-# Temporary video file path for streaming
 VIDEO_OUTPUT = "streamed_video.mp4"
 
 @app.route('/')
@@ -23,20 +21,15 @@ def start_streaming():
         return jsonify({"error": "Missing video_url"}), 400
 
     try:
-        # Ensure the previous video file is removed if it exists
-        if os.path.exists(VIDEO_OUTPUT):
-            os.remove(VIDEO_OUTPUT)
-
         # Download and convert video using yt-dlp and ffmpeg
         yt_dlp_command = [
             "python", "-m", "yt_dlp", "-o", "-", video_url
         ]
         ffmpeg_command = [
-            "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast", 
-            "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", VIDEO_OUTPUT
+            "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-movflags", "frag_keyframe+empty_moov",
+            "-f", "mp4", VIDEO_OUTPUT
         ]
 
-        # Pipe yt-dlp output to ffmpeg for streaming conversion
         yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE)
         ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout)
         yt_dlp_process.stdout.close()
@@ -64,4 +57,4 @@ def stop_streaming():
     return jsonify({"error": "No video file to delete."}), 400
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

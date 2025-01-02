@@ -1,88 +1,60 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, send_file
+from flask_cors import CORS
 import subprocess
-import threading
+import os
 
 app = Flask(__name__)
+CORS(app, origins=["*"])  # Allow access from any origin
 
-# Store the streaming process globally
-streaming_process = None
+VIDEO_OUTPUT = "streamed_video.mp4"
 
-
-def log_output(process, label):
-    """Logs the output and errors from a subprocess."""
-    def read_stream(stream, log_type):
-        for line in iter(stream.readline, b''):
-            print(f"[{label} {log_type}]: {line.decode().strip()}")
-
-    threading.Thread(target=read_stream, args=(process.stdout, "stdout"), daemon=True).start()
-    threading.Thread(target=read_stream, args=(process.stderr, "stderr"), daemon=True).start()
-
+@app.route('/')
+def home():
+    return jsonify({"message": "Welcome to the Video Service!"})
 
 @app.route('/start-streaming', methods=['POST'])
 def start_streaming():
-    global streaming_process
-
     data = request.json
     video_url = data.get("video_url")
-    rtmp_server_url = data.get("rtmp_server_url")
 
-    if not video_url or not rtmp_server_url:
-        return jsonify({"error": "Missing video_url or rtmp_server_url"}), 400
-
-    if streaming_process and streaming_process.poll() is None:
-        return jsonify({"error": "Streaming is already running."}), 400
+    if not video_url:
+        return jsonify({"error": "Missing video_url"}), 400
 
     try:
-        # Build and execute the command for yt-dlp and ffmpeg
+        # Download and convert video using yt-dlp and ffmpeg
         yt_dlp_command = [
             "python", "-m", "yt_dlp", "-o", "-", video_url
         ]
         ffmpeg_command = [
-            "ffmpeg", "-re", "-i", "-", "-c:v", "copy", "-f", "flv", rtmp_server_url
+            "ffmpeg", "-i", "-", "-c:v", "libx264", "-preset", "fast", "-movflags", "frag_keyframe+empty_moov",
+            "-f", "mp4", VIDEO_OUTPUT
         ]
 
-        print(f"Starting yt-dlp: {' '.join(yt_dlp_command)}")
-        print(f"Starting ffmpeg: {' '.join(ffmpeg_command)}")
+        yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE)
+        ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout)
+        yt_dlp_process.stdout.close()
+        ffmpeg_process.communicate()
 
-        # Start yt-dlp process
-        yt_dlp_process = subprocess.Popen(
-            yt_dlp_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        if not os.path.exists(VIDEO_OUTPUT):
+            return jsonify({"error": "Failed to process video"}), 500
 
-        # Start ffmpeg process with the yt-dlp output piped to it
-        streaming_process = subprocess.Popen(
-            ffmpeg_command, stdin=yt_dlp_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        yt_dlp_process.stdout.close()  # Allow yt-dlp to receive a SIGPIPE if ffmpeg closes
-
-        # Log outputs from both processes
-        log_output(yt_dlp_process, "yt-dlp")
-        log_output(streaming_process, "ffmpeg")
-
-        return jsonify({"message": "Streaming started successfully!"}), 200
+        return jsonify({"message": "Video ready for streaming!", "video_url": "/video"}), 200
 
     except Exception as e:
-        return jsonify({"error": f"Failed to start streaming: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to process video: {str(e)}"}), 500
 
+@app.route('/video', methods=['GET'])
+def video():
+    if not os.path.exists(VIDEO_OUTPUT):
+        return jsonify({"error": "No video found. Start streaming first."}), 404
+    return send_file(VIDEO_OUTPUT, mimetype='video/mp4')
 
 @app.route('/stop-streaming', methods=['POST'])
 def stop_streaming():
-    global streaming_process
-
-    if not streaming_process or streaming_process.poll() is not None:
-        return jsonify({"error": "No active streaming process found."}), 400
-
-    try:
-        # Terminate the streaming process and its children
-        print("Stopping streaming process...")
-        streaming_process.terminate()  # Terminate the process
-        streaming_process.wait()  # Ensure that we wait for the process to end
-        streaming_process = None
-        return jsonify({"message": "Streaming stopped successfully!"}), 200
-
-    except Exception as e:
-        return jsonify({"error": f"Failed to stop streaming: {str(e)}"}), 500
-
+    if os.path.exists(VIDEO_OUTPUT):
+        os.remove(VIDEO_OUTPUT)
+        return jsonify({"message": "Streaming stopped and video file deleted."}), 200
+    return jsonify({"error": "No video file to delete."}), 400
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000)
+    app.run(host='0.0.0.0', port=5000)

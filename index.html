@@ -1,91 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Streamer</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Streaming</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    video {
+      max-width: 100%;
+      height: auto;
+    }
+    .controls {
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
-    <h1>Video Streamer</h1>
-    
-    <label for="videoUrl">Enter YouTube Video URL:</label>
-    <input type="text" id="videoUrl" placeholder="Enter YouTube Video URL">
-    
-    <button id="startBtn">Start Streaming</button>
-    <button id="stopBtn" disabled>Stop Streaming</button>
-    
-    <video id="videoPlayer" controls></video>
-    
-    <script>
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const videoUrlInput = document.getElementById('videoUrl');
-        const videoPlayer = document.getElementById('videoPlayer');
+  <h1>Video Streaming Service</h1>
+  <div>
+    <video id="videoPlayer" controls>
+      <source src="" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div class="controls">
+    <input type="text" id="videoUrl" placeholder="Enter Video URL" style="width: 300px;">
+    <button onclick="startStreaming()">Start Streaming</button>
+    <button onclick="stopStreaming()">Stop Streaming</button>
+  </div>
 
-        const backendUrl = "https://developerstream.onrender.com";  // Replace with your backend URL
+  <script>
+    const backendUrl = "http://192.168.65.31:5000";
 
-        // Function to get cookies from the browser
-        function getCookies() {
-            // For simplicity, we assume you have cookies in the document
-            return document.cookie;  // You might need a different method depending on how cookies are handled in your app
+    async function startStreaming() {
+      const videoUrl = document.getElementById("videoUrl").value;
+      if (!videoUrl) {
+        alert("Please enter a video URL!");
+        return;
+      }
+
+      try {
+        const response = await fetch(`${backendUrl}/start-streaming`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_url: videoUrl })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          document.getElementById("videoPlayer").src = `${backendUrl}/video`;
+          alert("Streaming started! You can watch the video now.");
+        } else {
+          alert(`Error: ${data.error}`);
         }
+      } catch (error) {
+        alert(`Failed to start streaming: ${error.message}`);
+      }
+    }
 
-        startBtn.addEventListener('click', async () => {
-            const videoUrl = videoUrlInput.value;
-            const cookies = getCookies();  // Get cookies from the browser
+    async function stopStreaming() {
+      try {
+        const response = await fetch(`${backendUrl}/stop-streaming`, { method: "POST" });
 
-            if (!videoUrl) {
-                alert("Please enter a video URL!");
-                return;
-            }
+        const data = await response.json();
 
-            try {
-                const response = await fetch(`${backendUrl}/start-streaming`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        video_url: videoUrl, 
-                        cookies: cookies  // Send cookies for YouTube authentication
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert("Video ready for streaming!");
-                    stopBtn.disabled = false;  // Enable stop button
-                    videoPlayer.src = `${backendUrl}/video`;
-                } else {
-                    alert(`Error: ${data.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert("An error occurred while starting the stream.");
-            }
-        });
-
-        stopBtn.addEventListener('click', async () => {
-            try {
-                const response = await fetch(`${backendUrl}/stop-streaming`, {
-                    method: 'POST',
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert("Streaming stopped.");
-                    stopBtn.disabled = true;  // Disable stop button
-                    videoPlayer.src = "";  // Clear video source
-                } else {
-                    alert(`Error: ${data.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert("An error occurred while stopping the stream.");
-            }
-        });
-    </script>
+        if (response.ok) {
+          document.getElementById("videoPlayer").src = "";
+          alert("Streaming stopped and video deleted.");
+        } else {
+          alert(`Error: ${data.error}`);
+        }
+      } catch (error) {
+        alert(`Failed to stop streaming: ${error.message}`);
+      }
+    }
+  </script>
 </body>
 </html>
