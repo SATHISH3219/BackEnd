@@ -4,14 +4,15 @@ import subprocess
 import os
 
 app = Flask(__name__)
-CORS(app, origins=["*"], methods=['OPTIONS', 'GET', 'POST'])
+CORS(app, origins=["*"])  # Allow access from any origin
 
 VIDEO_OUTPUT = "streamed_video.mp4"
-COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")
+COOKIES_FILE = os.getenv("COOKIES_FILE", "cookies.txt")  # Environment variable for cookies file
 
 @app.route('/')
 def home():
     if os.path.exists(VIDEO_OUTPUT):
+        # Extract video duration using ffprobe
         try:
             result = subprocess.run(
                 ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", VIDEO_OUTPUT],
@@ -31,8 +32,7 @@ def home():
 
 @app.route('/stream', methods=['POST'])
 def developer_stream():
-    data = request.get_json()
-    video_url = data.get("video_url")
+    video_url = request.form.get("video_url")
     if not video_url:
         return jsonify({"error": "Please provide a valid video URL."}), 400
 
@@ -40,12 +40,11 @@ def developer_stream():
     return redirect(url_for('start_streaming', video_url=video_url))
 
 
-@app.route('/start-streaming', methods=['POST'])
+@app.route('/start-streaming', methods=['GET', 'POST'])
 def start_streaming():
-    # Retrieve video_url from the request JSON
-    data = request.get_json()
-    video_url = data.get("video_url")
-    
+    # Retrieve video_url from either form data (for POST) or query params (for GET)
+    video_url = request.form.get("video_url") or request.args.get("video_url")
+
     if not video_url:
         return jsonify({"error": "Missing video_url"}), 400
 
@@ -53,6 +52,7 @@ def start_streaming():
         return jsonify({"error": f"Cookies file not found at {COOKIES_FILE}"}), 500
 
     try:
+        # Download and stream live video (Twitch, YouTube, etc.) using yt-dlp
         yt_dlp_command = [
             "python", "-m", "yt_dlp", "--cookies", COOKIES_FILE, "-o", "-", video_url
         ]
@@ -62,20 +62,28 @@ def start_streaming():
         ]
 
         yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
+        ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout, stderr=subprocess.PIPE)
         yt_dlp_process.stdout.close()
-        ffmpeg_stdout, ffmpeg_stderr = ffmpeg_process.communicate()
+        ffmpeg_process.communicate()
 
-        if yt_dlp_process.returncode != 0:
-            yt_dlp_stderr = yt_dlp_process.stderr.read().decode()
-            return jsonify({"error": f"yt-dlp error: {yt_dlp_stderr}"}), 500
+        if not os.path.exists(VIDEO_OUTPUT):
+            return jsonify({"error": "Failed to process video"}), 500
 
-        if ffmpeg_process.returncode != 0:
-            ffmpeg_stderr = ffmpeg_process.stderr.read().decode()
-            return jsonify({"error": f"ffmpeg error: {ffmpeg_stderr}"}), 500
+        # Extract video duration
+        try:
+            result = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", VIDEO_OUTPUT],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            video_duration = float(result.stdout.strip())
+        except Exception:
+            video_duration = 0  # Default to 0 if extraction fails
 
-        return jsonify({"message": "Video streaming started successfully."}), 200
+        return jsonify({
+            "message": "Video ready for streaming!",
+            "video_url": "/video",
+            "duration_seconds": video_duration
+        }), 200
 
     except subprocess.CalledProcessError as e:
         return jsonify({"error": f"Video processing failed: {e.stderr}"}), 500
