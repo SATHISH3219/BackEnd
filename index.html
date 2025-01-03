@@ -1,94 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Streaming Service</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        input, button {
-            padding: 10px;
-            margin: 10px 0;
-        }
-        button {
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        video {
-            width: 100%;
-            max-width: 800px;
-            margin-top: 20px;
-        }
-        .error {
-            color: red;
-            font-size: 14px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Streaming</title>
 </head>
 <body>
-
-    <h1>Video Stream Service</h1>
-    <label for="videoUrl">Enter Video URL (e.g. YouTube URL):</label>
-    <input type="text" id="videoUrl" placeholder="Enter video URL">
-    <button onclick="startStream()">Start Stream</button>
-
-    <div id="error" class="error"></div>
-
-    <div id="videoContainer" style="display: none;">
-        <h2>Streaming Video:</h2>
-        <video id="videoPlayer" controls autoplay>
-            <source id="videoSource" src="" type="video/mp4">
-            Your browser does not support the video tag.
-        </video>
-    </div>
-
-    <script>
-        function startStream() {
-            const videoUrl = document.getElementById('videoUrl').value;
-            const errorDiv = document.getElementById('error');
-            const videoContainer = document.getElementById('videoContainer');
-            const videoSource = document.getElementById('videoSource');
-            const videoPlayer = document.getElementById('videoPlayer');
-
-            // Clear previous error
-            errorDiv.textContent = '';
-
-            if (!videoUrl) {
-                errorDiv.textContent = 'Please provide a valid video URL.';
-                return;
-            }
-
-            // Send the video URL to the backend to start the stream
-            fetch('http://localhost:5000/start-streaming', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ video_url: videoUrl })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                // Show the video player and start streaming
-                videoSource.src = 'http://localhost:5000/video';
-                videoPlayer.load(); // Load the new video source
-                videoContainer.style.display = 'block';
-            })
-            .catch(error => {
-                errorDiv.textContent = `Error: ${error.message}`;
-            });
-        }
-    </script>
-
+  <h1>Video Streaming</h1>
+  
+  <label for="videoUrl">Enter Video URL:</label>
+  <input type="text" id="videoUrl" placeholder="Enter YouTube Video URL">
+  <button onclick="startStreaming()">Start Streaming</button>
+  
+  <video id="videoPlayer" controls style="width: 100%; max-width: 600px;">
+    <p>Your browser does not support the video tag.</p>
+  </video>
+  
+  <script>
+    function startStreaming() {
+      const videoUrl = encodeURIComponent(document.getElementById('videoUrl').value);
+      
+      if (videoUrl) {
+        const streamUrl = `http://localhost:5000/stream?video_url=${videoUrl}`;
+        
+        const videoPlayer = document.getElementById('videoPlayer');
+        
+        // Set the video player's source to the backend stream URL
+        videoPlayer.src = streamUrl;
+        
+        videoPlayer.load(); // Load the stream
+        videoPlayer.play(); // Start playing the stream
+      } else {
+        alert('Please enter a video URL.');
+      }
+    }
+  </script>
 </body>
 </html>
