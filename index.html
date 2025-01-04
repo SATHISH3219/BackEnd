@@ -1,39 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Streaming</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Stream</title>
 </head>
 <body>
-  <h1>Video Streaming</h1>
-  
-  <label for="videoUrl">Enter Video URL:</label>
-  <input type="text" id="videoUrl" placeholder="Enter YouTube Video URL">
-  <button onclick="startStreaming()">Start Streaming</button>
-  
-  <video id="videoPlayer" controls style="width: 100%; max-width: 600px;">
-    <p>Your browser does not support the video tag.</p>
-  </video>
-  
-  <script>
-    function startStreaming() {
-      const videoUrl = encodeURIComponent(document.getElementById('videoUrl').value);
-      
-      if (videoUrl) {
-        const streamUrl = `http://localhost:5000/stream?video_url=${videoUrl}`;
-        
-        const videoPlayer = document.getElementById('videoPlayer');
-        
-        // Set the video player's source to the backend stream URL
-        videoPlayer.src = streamUrl;
-        
-        videoPlayer.load(); // Load the stream
-        videoPlayer.play(); // Start playing the stream
-      } else {
-        alert('Please enter a video URL.');
-      }
-    }
-  </script>
+    <h1>Live Video Stream</h1>
+    
+    <!-- Video Player -->
+    <video id="videoPlayer" controls autoplay style="width: 80%; max-width: 800px;">
+        <source src="http://192.168.65.31:5000/video" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    
+    <br><br>
+    
+    <!-- Video URL Input -->
+    <label for="videoUrl">Enter Video URL:</label>
+    <input type="text" id="videoUrl" placeholder="Enter YouTube/Twitch link" style="width: 400px;">
+    <br><br>
+    
+    <!-- Control Buttons -->
+    <button onclick="startStreaming()">Start Streaming</button>
+    <button onclick="stopStreaming()">Stop Streaming</button>
+    
+    <p id="message"></p>
+
+    <script>
+        async function startStreaming() {
+            const videoUrl = document.getElementById('videoUrl').value;
+            const messageDiv = document.getElementById('message');
+            
+            if (!videoUrl) {
+                messageDiv.innerText = '❌ Please enter a valid video URL!';
+                return;
+            }
+
+            try {
+                const response = await fetch('http://192.168.65.31:5000/start-streaming', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_url: videoUrl })
+                });
+                const result = await response.json();
+                messageDiv.innerText = result.message || result.error;
+
+                if (response.ok) {
+                    document.getElementById('videoPlayer').load();
+                }
+            } catch (error) {
+                messageDiv.innerText = '❌ Error: ' + error.message;
+            }
+        }
+
+        async function stopStreaming() {
+            const messageDiv = document.getElementById('message');
+            try {
+                const response = await fetch('http://192.168.65.31:5000/stop-streaming', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                messageDiv.innerText = result.message || result.error;
+
+                document.getElementById('videoPlayer').src = '';
+            } catch (error) {
+                messageDiv.innerText = '❌ Error: ' + error.message;
+            }
+        }
+    </script>
 </body>
 </html>
