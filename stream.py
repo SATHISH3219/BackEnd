@@ -28,7 +28,7 @@ def start_streaming():
         return jsonify({"error": "Missing video_url"}), 400
 
     try:
-        # Check if cookies file exists
+        # Ensure the cookies file exists
         if not os.path.exists(COOKIES_FILE):
             return jsonify({"error": "Cookies file not found. Please provide a valid cookies file."}), 400
 
@@ -37,13 +37,16 @@ def start_streaming():
             "python", "-m", "yt_dlp", "--cookies", COOKIES_FILE, "--get-url", video_url
         ]
         result = subprocess.run(is_live_check_command, capture_output=True, text=True)
+        if result.returncode != 0:
+            return jsonify({"error": "Failed to fetch video details. Check the video URL or cookies."}), 400
+
         is_live = "live" in result.stdout.lower()
 
         yt_dlp_command = [
             "python", "-m", "yt_dlp", "--cookies", COOKIES_FILE, "-o", "-", video_url
         ]
 
-        # ffmpeg command to stream to MP4
+        # FFmpeg command to stream video to MP4
         ffmpeg_command = [
             "ffmpeg", "-re" if is_live else "", "-i", "-", "-c:v", "libx264", "-preset", "fast",
             "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-movflags", "frag_keyframe+empty_moov",
@@ -51,9 +54,9 @@ def start_streaming():
         ]
         ffmpeg_command = [arg for arg in ffmpeg_command if arg]  # Remove empty arguments
 
-        # Start yt-dlp and ffmpeg processes
-        yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE)
-        ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout)
+        # Start yt-dlp and FFmpeg processes
+        yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout, stderr=subprocess.PIPE)
         yt_dlp_process.stdout.close()
 
         return jsonify({
@@ -70,7 +73,10 @@ def start_streaming():
 def video():
     if not os.path.exists(VIDEO_OUTPUT):
         return jsonify({"error": "No video found. Start streaming first."}), 404
-    return send_file(VIDEO_OUTPUT, mimetype='video/mp4')
+    try:
+        return send_file(VIDEO_OUTPUT, mimetype='video/mp4')
+    except Exception as e:
+        return jsonify({"error": f"Failed to retrieve video: {str(e)}"}), 500
 
 
 @app.route('/stop-streaming', methods=['POST'])
@@ -78,7 +84,7 @@ def stop_streaming():
     global yt_dlp_process, ffmpeg_process
 
     try:
-        # Stop yt-dlp and ffmpeg processes
+        # Terminate yt-dlp and FFmpeg processes
         if ffmpeg_process:
             ffmpeg_process.terminate()
             ffmpeg_process.wait()
