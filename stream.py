@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, Response
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import subprocess
 import os
@@ -7,6 +7,7 @@ app = Flask(__name__)
 CORS(app, origins=["*"])
 
 VIDEO_OUTPUT = "streamed_video.mp4"
+COOKIES_FILE = "cookies.txt"  # Path to the cookies file
 yt_dlp_process = None
 ffmpeg_process = None
 
@@ -27,15 +28,19 @@ def start_streaming():
         return jsonify({"error": "Missing video_url"}), 400
 
     try:
+        # Check if cookies file exists
+        if not os.path.exists(COOKIES_FILE):
+            return jsonify({"error": "Cookies file not found. Please provide a valid cookies file."}), 400
+
         # Check if the video is live or pre-recorded
         is_live_check_command = [
-            "python", "-m", "yt_dlp", "--get-url", video_url
+            "python", "-m", "yt_dlp", "--cookies", COOKIES_FILE, "--get-url", video_url
         ]
         result = subprocess.run(is_live_check_command, capture_output=True, text=True)
         is_live = "live" in result.stdout.lower()
 
         yt_dlp_command = [
-            "python", "-m", "yt_dlp", "-o", "-", video_url
+            "python", "-m", "yt_dlp", "--cookies", COOKIES_FILE, "-o", "-", video_url
         ]
 
         # ffmpeg command to stream to MP4
@@ -44,8 +49,9 @@ def start_streaming():
             "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-movflags", "frag_keyframe+empty_moov",
             "-f", "mp4", VIDEO_OUTPUT
         ]
-        ffmpeg_command = [arg for arg in ffmpeg_command if arg]
+        ffmpeg_command = [arg for arg in ffmpeg_command if arg]  # Remove empty arguments
 
+        # Start yt-dlp and ffmpeg processes
         yt_dlp_process = subprocess.Popen(yt_dlp_command, stdout=subprocess.PIPE)
         ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=yt_dlp_process.stdout)
         yt_dlp_process.stdout.close()
@@ -65,6 +71,7 @@ def video():
     if not os.path.exists(VIDEO_OUTPUT):
         return jsonify({"error": "No video found. Start streaming first."}), 404
     return send_file(VIDEO_OUTPUT, mimetype='video/mp4')
+
 
 @app.route('/stop-streaming', methods=['POST'])
 def stop_streaming():
